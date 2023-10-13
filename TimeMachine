@@ -1,0 +1,138 @@
+#include <WiFiNINA.h>
+#include <SPI.h>
+#include <ArduinoBLE.h>
+#include <Arduino_LSM6DS3.h>
+#define SECRET_SSID ""
+#define SECRET_PASS ""
+
+char ssid[] = SECRET_SSID;
+char pass[] = SECRET_PASS;
+int status = WL_IDLE_STATUS;
+float x, y, z;
+int plusThreshold = 5, minusThreshold = -5;
+BLEService ledService("180A");
+BLEByteCharacteristic switchCharacteristic("2A57", BLERead | BLEWrite);
+IPAddress dns(set, your, dns, here);
+WiFiUDP udp;
+WiFiServer server(666);
+
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Scanning");
+  scanNetworks();
+  while (status != WL_CONNECTED) {
+    Serial.print("Attempting to connect to network: ");
+    Serial.println(ssid);
+    status = WiFi.begin(ssid, pass);
+    delay(10000);
+  }
+  WiFi.setDNS(dns);
+  WiFi.setHostname("zc:hostname");
+  udp.beginMulticast(IPAddress(0, 0, 0, 0), 555);
+  server.begin();
+  while (!Serial);
+  if (!BLE.begin()) {
+    Serial.println("starting Bluetooth Low Energy Failed");
+
+    while (1);
+  }
+  BLE.setLocalName("%00");
+  BLE.setAdvertisedService(ledService);
+  ledService.addCharacteristic(switchCharacteristic);
+  BLE.addService(ledService);
+  switchCharacteristic.writeValue(0);
+  BLE.advertise();
+  Serial.println("BLE LED Peripheral");
+  if (!IMU.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while(1);
+  }
+  Serial.print("Gyroscope sample rate = ");
+  Serial.print(IMU.gyroscopeSampleRate());
+  Serial.println(" Hz");
+  Serial.println();
+  Serial.println("Gyroscope in degrees/second");
+}
+void loop () {
+
+  BLEDevice central = BLE.central();
+  if (central) {
+    Serial.print("Connected to central: ");
+    Serial.println(central.address());
+
+    while (central.connected()) {
+      if (switchCharacteristic.written()) {
+        switch (switchCharacteristic.value()) {
+          case 01:
+            Serial.println("LED on");
+            digitalWrite(LED_BUILTIN, HIGH);
+            break;
+          case 02:
+            Serial.println("LED fast blink");
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(500);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(500);
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(500);
+            digitalWrite(LED_BUILTIN, LOW);
+            break;
+          case 03:
+            Serial.println("LED slow blink");
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, LOW);
+            break;
+          default:
+            Serial.println(F("LED off"));
+            digitalWrite(LED_BUILTIN, LOW);
+            break;
+        }
+      }
+    }
+    Serial.print(F("Disconnected from central: "));
+    Serial.println(central.address());
+    digitalWrite(LED_BUILTIN, LOW);
+  }
+  if (IMU.gyroscopeAvailable()) {
+    IMU.readGyroscope(x, y, z);
+  }
+  if (y > plusThreshold) {
+    int(y) ^ int(x);
+    Serial.println("Collision front");
+    delay(500);
+  }
+  if (y < minusThreshold){
+    int(x) ^ int(y);
+    Serial.println("Collision back");
+    delay(500);
+  }
+  if(x < minusThreshold){
+    int(x) ^ int(y);
+    Serial.println("Collision right");
+    delay(500);
+  }
+  if(x > plusThreshold){
+    int(y) ^ int(x);
+    Serial.println("Collision left");
+    delay(500);
+  }
+}
+
+void scanNetworks() {
+  Serial.println("*** Scan Networks ***");
+  byte numSsid = WiFi.scanNetworks();
+
+  Serial.print("SSID List:");
+  Serial.println(numSsid);
+  for (int thisNet = 0; thisNet<numSsid; thisNet++) {
+    Serial.print(thisNet);
+    Serial.print(" Network: ");
+    Serial.println(WiFi.SSID(thisNet));
+  }
+}
