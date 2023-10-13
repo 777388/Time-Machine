@@ -8,3 +8,5 @@ BE sure to set your IP and DNS in the program
 Move the device to cause a collision that causes electrons to escape collision by moving backwards in time.
 
 You may also want to get an RFID reader, set it to clone mode and leave your identities on top of it.
+
+To influence Light Atmosphere, get yourself an Mendocino Motor and place it above the router this connects to.
